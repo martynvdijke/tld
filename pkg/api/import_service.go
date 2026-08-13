@@ -70,9 +70,10 @@ func (s *ImportService) ImportResources(ctx context.Context, req *connect.Reques
 	}), nil
 }
 
-// ParseStructurizr parses Structurizr DSL into plan elements and connectors.
+// ParseStructurizr parses Structurizr DSL (or any other supported format,
+// auto-detected) into plan elements and connectors.
 func (s *ImportService) ParseStructurizr(ctx context.Context, req *connect.Request[diagv1.ParseStructurizrRequest]) (*connect.Response[diagv1.ParseStructurizrResponse], error) {
-	parsed, err := importer.ParseStructurizr(req.Msg.GetCode())
+	parsed, err := importer.Parse(req.Msg.GetCode())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}

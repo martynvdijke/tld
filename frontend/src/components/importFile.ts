@@ -1,8 +1,11 @@
-export type ImportFileFormat = 'mermaid' | 'structurizr' | 'unsupported-yaml' | 'unsupported'
+export type ImportFileFormat = 'mermaid' | 'structurizr' | 'github-actions' | 'unsupported-yaml' | 'unsupported'
 
 export function inferImportFileFormat(path: string): ImportFileFormat {
   const clean = path.trim().toLowerCase()
   if (clean.endsWith('.dsl')) return 'structurizr'
+  if (clean.includes('.github/workflows/') && (clean.endsWith('.yaml') || clean.endsWith('.yml'))) {
+    return 'github-actions'
+  }
   if (clean.endsWith('.yaml') || clean.endsWith('.yml')) return 'unsupported-yaml'
   if (
     clean.endsWith('.md') ||

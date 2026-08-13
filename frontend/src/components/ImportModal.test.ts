@@ -10,6 +10,12 @@ describe('ImportModal file helpers', () => {
     expect(inferImportFileFormat('/tmp/notes.txt')).toBe('mermaid')
   })
 
+  it('detects GitHub Actions workflows in .github/workflows paths', () => {
+    expect(inferImportFileFormat('/repo/.github/workflows/ci.yml')).toBe('github-actions')
+    expect(inferImportFileFormat('/repo/.github/workflows/release.yaml')).toBe('github-actions')
+    expect(unsupportedImportFileMessage('/repo/.github/workflows/ci.yml')).toBeNull()
+  })
+
   it('returns explicit unsupported messages for yaml and unknown files', () => {
     expect(unsupportedImportFileMessage('/tmp/elements.yaml')).toContain('YAML workspace files are not supported')
     expect(unsupportedImportFileMessage('/tmp/diagram.json')).toContain('Unsupported file type')

@@ -165,6 +165,17 @@ func (c *architectureCollector) scanYAML(absPath, rel string) {
 	}
 	defer func() { _ = f.Close() }()
 
+	// GitHub Actions files carry no kind:/services: markers, so dispatch them
+	// by path before the generic runtime YAML sniff.
+	if isGitHubActionsPath(rel) {
+		c.scanGitHubWorkflow(f, rel)
+		return
+	}
+	if isGitHubActionManifest(rel) {
+		c.scanGitHubActionManifest(f, rel)
+		return
+	}
+
 	var prefix [8192]byte
 	n, err := f.Read(prefix[:])
 	if err != nil && err != io.EOF {

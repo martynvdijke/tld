@@ -31,6 +31,9 @@ type Importer interface {
 }
 
 func DetectFormat(input string) string {
+	if looksLikeGitHubWorkflow(input) {
+		return "github-workflow"
+	}
 	if strings.Contains(input, "architecture-beta") {
 		return "mermaid"
 	}
@@ -42,10 +45,14 @@ func DetectFormat(input string) string {
 
 func Parse(input string) (*ParsedWorkspace, error) {
 	format := DetectFormat(input)
-	if format == "structurizr" {
+	switch format {
+	case "github-workflow":
+		return ParseGitHubWorkflow(input)
+	case "structurizr":
 		return ParseStructurizr(input)
+	default:
+		return &ParsedWorkspace{
+			Warnings: []string{"Format not fully supported. Using default Structurizr parser."},
+		}, nil
 	}
-	return &ParsedWorkspace{
-		Warnings: []string{"Format not fully supported. Using default Structurizr parser."},
-	}, nil
 }

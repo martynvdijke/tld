@@ -36,7 +36,7 @@ interface Props {
   getImportWarnings?: (parsed: ParsedImport) => Promise<string[]> | string[]
 }
 
-type Format = 'mermaid' | 'structurizr'
+type Format = 'mermaid' | 'structurizr' | 'github-actions'
 
 const MERMAID_PLACEHOLDER = `flowchart LR
   A[Start] --> B[End]`
@@ -49,6 +49,23 @@ const STRUCTURIZR_PLACEHOLDER = `workspace {
   }
 }`
 
+const GITHUB_ACTIONS_PLACEHOLDER = `name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/notify
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: octo-org/repo/.github/workflows/release.yml@main`
+
 function ImportModal({ isOpen, onClose, mermaidEnabled = false, isImporting, onImport, getImportWarnings }: Props) {
   const [code, setCode] = useState('')
   const [format, setFormat] = useState<Format>(() => mermaidEnabled ? 'mermaid' : 'structurizr')
@@ -59,6 +76,15 @@ function ImportModal({ isOpen, onClose, mermaidEnabled = false, isImporting, onI
   const [isParsing, setIsParsing] = useState(false)
   const [isOpeningFile, setIsOpeningFile] = useState(false)
   const summaryWarnings = parsed ? [...parsed.warnings, ...importWarnings] : []
+  const tabIndex = mermaidEnabled
+    ? format === 'mermaid'
+      ? 0
+      : format === 'github-actions'
+        ? 2
+        : 1
+    : format === 'github-actions'
+      ? 1
+      : 0
 
   useEffect(() => {
     if (!isOpen) return
@@ -71,7 +97,11 @@ function ImportModal({ isOpen, onClose, mermaidEnabled = false, isImporting, onI
   }, [isOpen, mermaidEnabled])
 
   const handleTabChange = (index: number) => {
-    setFormat(mermaidEnabled && index === 0 ? 'mermaid' : 'structurizr')
+    if (mermaidEnabled) {
+      setFormat(index === 0 ? 'mermaid' : index === 1 ? 'structurizr' : 'github-actions')
+    } else {
+      setFormat(index === 0 ? 'structurizr' : 'github-actions')
+    }
     setCode('')
     setImportWarnings([])
     setParseError(null)
@@ -88,7 +118,9 @@ function ImportModal({ isOpen, onClose, mermaidEnabled = false, isImporting, onI
       setParseError('Mermaid Markdown import is experimental. Enable it in settings to import Markdown Mermaid blocks.')
       return
     }
-    setFormat(nextFormat === 'structurizr' ? 'structurizr' : 'mermaid')
+    setFormat(
+      nextFormat === 'github-actions' ? 'github-actions' : nextFormat === 'structurizr' ? 'structurizr' : 'mermaid',
+    )
     setCode(content)
     setStep('input')
     setParsed(null)
@@ -149,7 +181,7 @@ function ImportModal({ isOpen, onClose, mermaidEnabled = false, isImporting, onI
       return
     }
 
-    // Structurizr: parse server-side
+    // Structurizr / GitHub Actions: parse server-side (auto-detected)
     setIsParsing(true)
     try {
       const res = await api.import.parseStructurizr(code)
@@ -165,7 +197,7 @@ function ImportModal({ isOpen, onClose, mermaidEnabled = false, isImporting, onI
       setParsed(result)
       setStep('summary')
     } catch (e: unknown) {
-      setParseError(e instanceof Error ? e.message : 'Failed to parse Structurizr DSL')
+      setParseError(e instanceof Error ? e.message : 'Failed to parse diagram')
     } finally {
       setIsParsing(false)
     }
@@ -192,10 +224,11 @@ function ImportModal({ isOpen, onClose, mermaidEnabled = false, isImporting, onI
               </HStack>
             )}
             {step === 'input' ? (
-              <Tabs index={mermaidEnabled && format === 'mermaid' ? 0 : mermaidEnabled ? 1 : 0} onChange={handleTabChange} size="sm" variant="enclosed">
+              <Tabs index={tabIndex} onChange={handleTabChange} size="sm" variant="enclosed">
                 <TabList>
                   {mermaidEnabled && <Tab>Mermaid Markdown</Tab>}
                   <Tab>Structurizr DSL</Tab>
+                  <Tab>GitHub Actions</Tab>
                 </TabList>
                 <TabPanels>
                   {mermaidEnabled && (
@@ -231,6 +264,23 @@ function ImportModal({ isOpen, onClose, mermaidEnabled = false, isImporting, onI
                       />
                       <Text mt={1.5} fontSize="xs" color="gray.400">
                         Paste a Structurizr workspace DSL. Imports people, software systems, containers, and their relationships.
+                      </Text>
+                    </FormControl>
+                  </TabPanel>
+                  <TabPanel px={0} pb={0}>
+                    <FormControl>
+                      <FormLabel fontSize="sm">GitHub Actions workflow YAML</FormLabel>
+                      <Textarea
+                        data-testid="import-github-actions-textarea"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        placeholder={GITHUB_ACTIONS_PLACEHOLDER}
+                        size="sm"
+                        rows={12}
+                        fontFamily="mono"
+                      />
+                      <Text mt={1.5} fontSize="xs" color="gray.400">
+                        Paste a GitHub Actions workflow. Imports workflows, jobs, action dependencies, and reusable workflow calls.
                       </Text>
                     </FormControl>
                   </TabPanel>

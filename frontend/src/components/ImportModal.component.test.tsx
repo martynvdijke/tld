@@ -2,13 +2,18 @@ import React from 'react'
 import { act, create } from 'react-test-renderer'
 import { describe, expect, it, vi } from 'vitest'
 import ImportModal from './ImportModal'
+import { api } from '../api/client'
 
 vi.mock('../config/runtime', () => ({ isWailsApp: false }))
 
 vi.mock('../api/client', () => ({
   api: {
     import: {
-      parseStructurizr: vi.fn(),
+      parseStructurizr: vi.fn(async () => ({
+        elements: [],
+        connectors: [],
+        warnings: [],
+      })),
     },
     mermaid: {
       parse: vi.fn(async (source: string) => ({
@@ -95,5 +100,50 @@ describe('ImportModal warnings', () => {
     })
 
     expect(onImport).toHaveBeenCalled()
+  })
+
+  it('imports GitHub Actions workflow YAML through the auto-detecting RPC', async () => {
+    const onImport = vi.fn()
+    let renderer!: ReturnType<typeof create>
+    await act(async () => {
+      renderer = create(
+        <ImportModal
+          isOpen
+          onClose={vi.fn()}
+          mermaidEnabled={false}
+          onImport={onImport}
+        />,
+      )
+    })
+
+    const workflow = `name: CI
+on: push
+jobs:
+  build:
+    steps:
+      - uses: actions/checkout@v4
+`
+
+    act(() => {
+      renderer.root.findByProps({ 'data-testid': 'import-github-actions-textarea' }).props.onChange({
+        target: { value: workflow },
+      })
+    })
+    await act(async () => {
+      await renderer.root.findByProps({ 'data-testid': 'import-next' }).props.onClick()
+    })
+
+    expect(api.import.parseStructurizr).toHaveBeenCalledWith(workflow)
+
+    await act(async () => {
+      await renderer.root.findByProps({ 'data-testid': 'import-confirm' }).props.onClick()
+    })
+
+    expect(onImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        format: 'structurizr',
+        source: workflow,
+      }),
+    )
   })
 })
