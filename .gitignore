@@ -16,3 +16,6 @@ build/
 .bin/
 .gocache/
 testdata/
+
+# Zensical build output
+site/
